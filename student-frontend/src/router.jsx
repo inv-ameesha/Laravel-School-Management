@@ -6,6 +6,7 @@ import TeacherList from "./pages/TeacherList";
 import AddStudent from "./pages/AddStudents";
 import AddTeacher from "./pages/AddTeachers";
 import EditStudent from "./pages/EditStudent";
+import EditTeacher from "./pages/EditTeacher";
 const router = createBrowserRouter([
   {
     path: "/",
@@ -34,6 +35,10 @@ const router = createBrowserRouter([
   {
     path: "/edit-student/:id",
     element: <EditStudent />,
+  },
+  {
+    path: "/edit-teacher/:id",
+    element: <EditTeacher />,
   },
 ]);
 

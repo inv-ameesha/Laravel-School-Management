@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { useMutation } from '@tanstack/react-query';
+//useMutation - a hook from react query mutation to perform operations like PUT,POST,DELETE etc
 import Layout from '../components/Layout';
+import { AuthContext } from "../context/AuthContext";
 
 const AddStudent = () => {
+  const { user } = useContext(AuthContext);
   const [form, setForm] = useState({
     first_name: '',
     last_name: '',
@@ -15,21 +18,24 @@ const AddStudent = () => {
     admission_date: '',
     status: 'Active',
     teacher_id: '',
-    password: ''
+    password: '',
   });
 
-  const [teachers, setTeachers] = useState([]);
+  const [teachers, setTeachers] = useState([]);//to store all the teachers
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
+    // fetch all teachers only if user is admin
     const fetchTeachers = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get('http://127.0.0.1:8000/api/teachers', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (Array.isArray(res.data)) {
-          setTeachers(res.data);
+        if(user.role === "admin") {
+          const token = localStorage.getItem('token');
+          const res = await axios.get('http://127.0.0.1:8000/api/teachers', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (Array.isArray(res.data)) {//if the response data is array 
+            setTeachers(res.data);//set it to teachers state
+          }
         }
       } catch (error) {
         console.error('Failed to fetch teachers:', error);
@@ -37,9 +43,17 @@ const AddStudent = () => {
     };
 
     fetchTeachers();
-  }, []);
+  }, [user.role]);
+
+  useEffect(() => {
+    if (user.role === "teacher") {
+      // for teacher, set teacher_id automatically from user info
+      setForm((prev) => ({ ...prev, teacher_id: user.teacher_id }));
+    }
+  }, [user]);
 
   const mutation = useMutation({
+    //mutationFn : sends a post request to laravel to add a new student using token
     mutationFn: async (newStudent) => {
       const token = localStorage.getItem('token');
       return await axios.post('http://127.0.0.1:8000/api/students', newStudent, {
@@ -47,7 +61,7 @@ const AddStudent = () => {
       });
     },
     onSuccess: () => {
-      setSuccessMessage('Student added successfully!');
+      setSuccessMessage('Student added successfully!');//shows success msg
       // Reset form
       setForm({
         first_name: '',
@@ -59,7 +73,7 @@ const AddStudent = () => {
         dob: '',
         admission_date: '',
         status: 'Active',
-        teacher_id: '',
+        teacher_id: user.role === "teacher" ? user.teacher_id : '', // keep teacher_id if teacher
         password: ''
       });
     },
@@ -68,7 +82,7 @@ const AddStudent = () => {
       alert('Failed to add student');
     }
   });
-
+  //hides the success msg after 3s
   useEffect(() => {
     if (successMessage) {
       const timer = setTimeout(() => {
@@ -78,13 +92,16 @@ const AddStudent = () => {
     }
   }, [successMessage]);
 
-  const handleChange = (e) => {
+  const handleChange = (e) => {//when type something the form updtes with that current value
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
     mutation.mutate(form);
+    //1.user action occured ; 
+    //2.data from that action send to mutation func
+    //3.mutation func will interact with the backend nd do operations required
   };
 
   return (
@@ -182,19 +199,22 @@ const AddStudent = () => {
           <option value="Active">Active</option>
           <option value="Inactive">Inactive</option>
         </select>
-        <select
-          name="teacher_id"
-          onChange={handleChange}
-          value={form.teacher_id}
-          required
-        >
-          <option value="">-- Select Teacher --</option>
-          {teachers.map((teacher) => (
-            <option key={teacher.id} value={teacher.id}>
-              {teacher.first_name} {teacher.last_name}
-            </option>
-          ))}
-        </select>
+        {/* Show teacher dropdown only for admin */}
+        {user.role === "admin" && (
+          <select
+            name="teacher_id"
+            onChange={handleChange}
+            value={form.teacher_id}
+            required
+          >
+            <option value="">-- Select Teacher --</option>
+            {teachers.map((teacher) => (
+              <option key={teacher.id} value={teacher.id}>
+                {teacher.first_name} {teacher.last_name}
+              </option>
+            ))}
+          </select>
+        )}
 
         <button type="submit" disabled={mutation.isLoading}>Add Student</button>
       </form>

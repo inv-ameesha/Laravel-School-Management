@@ -30,12 +30,13 @@ const Login = () => {
       setToken(res.data.access_token);
       setUser({
         id: res.data.user_id,
+        teacher_id: res.data.teacher_id,
         name: res.data.user_name,
         email: res.data.user_email,
         role: res.data.user_role,
       });
 
-      if (res.data.user_role === "admin") {
+      if (res.data.user_role === "admin"||res.data.user_role === "teacher") {
         navigate("/home");
       } else {
         navigate("/students");
