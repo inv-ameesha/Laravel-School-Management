@@ -10,6 +10,7 @@ class RoleMiddleware
     public function handle(Request $request, Closure $next, ...$roles)
     {
         $user = $request->user();
+        //echo $roles;
 
         if (!$user || !in_array($user->role, $roles)) {
             return response()->json(['message' => 'Forbidden'], 403);

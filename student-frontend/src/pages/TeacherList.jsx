@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import Layout from "../components/Layout";
 import { useNavigate } from "react-router-dom";
-
+import api from "../api/axios";
 const TeacherList = () => {
   const [teachers, setTeachers] = useState([]); //state to store the fetched teacher's data
   const [loading, setLoading] = useState(true); //to check whether data is loading/not
@@ -10,24 +10,37 @@ const TeacherList = () => {
   const teachersPerPage = 2;
   const navigate = useNavigate();
 
+  // useEffect(() => {
+  //   const token = localStorage.getItem("token");
+  //   axios
+  //     .get("http://localhost:8000/api/teachers", {
+  //       headers: {
+  //         Authorization: `Bearer ${token}`,
+  //       },
+  //     })
+  //     .then((res) => {
+  //       setTeachers(res.data); //once obtained set the obtained data
+  //       setLoading(false); //now make loading false,bcz data received
+  //     })
+  //     .catch((err) => {
+  //       console.error("Failed to fetch teachers:", err);
+  //       setLoading(false);
+  //     });
+  // }, []); //[] : means the component runs only once its loaded
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    axios
-      .get("http://localhost:8000/api/teachers", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+    api
+      .get('/teachers') // No need to manually add headers
       .then((res) => {
-        setTeachers(res.data); //once obtained set the obtained data
-        setLoading(false); //now make loading false,bcz data received
+        setTeachers(res.data);
+        console.log(res.data);
+        
+        setLoading(false);
       })
       .catch((err) => {
-        console.error("Failed to fetch teachers:", err);
+        console.error('Failed to fetch teachers:', err);
         setLoading(false);
       });
-  }, []); //[] : means the component runs only once its loaded
-
+  }, []);
   const handleEdit = (id) => {
     navigate(`/edit-teacher/${id}`);
   };
@@ -83,9 +96,9 @@ const TeacherList = () => {
           </tr>
         </thead>
         <tbody>
-          {currentTeachers.map((teacher, index) => (
+          {currentTeachers?.length>0&&currentTeachers?.map((teacher, index) => (
             <tr key={teacher.id}>
-              <td>{index + 1}</td>
+              <td>{indexOfFirstTeacher + index + 1}</td>
               <td>
                 {teacher.first_name} {teacher.last_name}
               </td>
@@ -105,7 +118,7 @@ const TeacherList = () => {
       </table>
       <div
         style={{
-          paddingLeft:"370px",
+          paddingLeft: "370px",
           marginTop: "10px",
           display: "flex",
           alignItems: "center",
@@ -133,5 +146,4 @@ const TeacherList = () => {
     </Layout>
   );
 };
-
 export default TeacherList;

@@ -1,4 +1,4 @@
-import { useEffect , useState , useContext} from "react";
+import { useEffect, useState, useContext } from "react";
 //useDispatch : lets you to send actions to Redux store
 //useSelector : allows to access redux store
 import { useDispatch, useSelector } from "react-redux";
@@ -6,42 +6,36 @@ import { fetchStudents } from "../redux/StudentsSlice";
 import Layout from "../components/Layout";
 import { FaEdit, FaTrash } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-import axios from 'axios';
-import {AuthContext } from "../context/AuthContext";
+import axios from "axios";
+import { AuthContext } from "../context/AuthContext";
 const StudentList = () => {
-   const { user } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const [currentPage, setCurrentPage] = useState(1);
   const studentsPerPage = 5;
   //access students slice from redux state
-  //list : student objects 
+  //list : student objects
   const { list, loading } = useSelector((state) => state.students);
 
-  useEffect(() => {//runs once the component mounts
-    dispatch(fetchStudents());//student data loads
-  }, [dispatch]);//[dispatch] : default dependancy array of useeffect hook: once changed data loads
+  useEffect(() => {
+    //runs once the component mounts
+    dispatch(fetchStudents()); //student data loads
+  }, [dispatch]); //[dispatch] : default dependancy array of useeffect hook: once changed data loads
 
   const handleEdit = (studentId) => {
     navigate(`/edit-student/${studentId}`);
   };
 
-  const handleDelete = async (studentId) => {//soft delete 
+  const handleDelete = async (studentId) => {
+    //soft delete
     if (!window.confirm("Are you sure you want to delete this student?"))
       return;
 
     try {
-      await axios.put(//instead of delete the status changed from active to inactive
-        `http://localhost:8000/api/students/${studentId}`,
-        {
-          status: "Inactive",
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
+      await api.put(`/students/${studentId}`, {
+        status: "Inactive",
+      });
       dispatch(fetchStudents()); //it refreshes the students list
     } catch (err) {
       console.error("Delete (status update) failed:", err);
@@ -50,24 +44,30 @@ const StudentList = () => {
   };
 
   if (loading) return <p>Loading...</p>;
- const filteredList =
+  const filteredList =
     user?.role === "teacher"
       ? list.filter((student) => student.teacher_id === user.teacher_id)
-      : list;
+      : list; //filters to get assigned students list if teacher and the entire student list if admin
 
-  const indexOfLastStudent = currentPage * studentsPerPage;
-  const indexOfFirstStudent = indexOfLastStudent - studentsPerPage;
-  const currentStudents = filteredList.slice(indexOfFirstStudent, indexOfLastStudent);
+  const indexOfLastStudent = currentPage * studentsPerPage; //if cp=2,spp=5 thn index=2*5=10
+  const indexOfFirstStudent = indexOfLastStudent - studentsPerPage; //if index=10,spp=5 thn indexoffirst=10-5=5
+  //give the students of the current pg..slice(5,10) displays that chunk
+  const currentStudents = filteredList.slice(
+    indexOfFirstStudent,
+    indexOfLastStudent
+  );
   const totalPages = Math.ceil(filteredList.length / studentsPerPage);
   const displayPage = totalPages === 0 ? 0 : currentPage;
 
   const handlePrevPage = () => {
-    if (currentPage > 1) setCurrentPage(prev => prev - 1);
+    if (currentPage > 1) setCurrentPage((prev) => prev - 1);
   };
 
   const handleNextPage = () => {
-    if (currentPage < totalPages) setCurrentPage(prev => prev + 1);
+    if (currentPage < totalPages) setCurrentPage((prev) => prev + 1);
   };
+  console.log("ppp", typeof currentStudents);
+  
   return (
     <Layout>
       <h2>Student List</h2>
@@ -88,7 +88,7 @@ const StudentList = () => {
           </tr>
         </thead>
         <tbody>
-          {currentStudents.map((student, index) => (
+          {currentStudents?.length>0&&currentStudents?.map((student, index) => (
             <tr key={student.id}>
               <td>{indexOfFirstStudent + index + 1}</td>
               <td>{student.first_name}</td>

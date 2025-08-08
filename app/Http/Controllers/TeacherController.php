@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\Validator;
 use App\Models\User;
+use App\Models\Student;
 use App\Models\Teacher;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Http\Request;
@@ -54,6 +55,7 @@ class TeacherController extends Controller
             'employee_id'           => $request->employee_id,
             'date_of_joining'       => $request->date_of_joining,
             'status'                => $request->status,
+            'user_id'               => $user->id,
         ]);
 
         return response()->json([
@@ -108,4 +110,5 @@ class TeacherController extends Controller
 
         return response()->json(['message' => 'Teacher deleted (soft deleted & marked Inactive)']);
     }
+    
 }

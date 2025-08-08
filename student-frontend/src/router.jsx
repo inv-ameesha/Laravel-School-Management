@@ -7,6 +7,10 @@ import AddStudent from "./pages/AddStudents";
 import AddTeacher from "./pages/AddTeachers";
 import EditStudent from "./pages/EditStudent";
 import EditTeacher from "./pages/EditTeacher";
+import Notifications from "./pages/Notifications";
+import TeacherNotifications from "./pages/TeacherNotifications";
+import StudentDashboard from "./pages/StudentDashboard";
+import StudentNotifications from "./pages/StudentNotifications";
 const router = createBrowserRouter([
   {
     path: "/",
@@ -39,6 +43,26 @@ const router = createBrowserRouter([
   {
     path: "/edit-teacher/:id",
     element: <EditTeacher />,
+  },
+  {
+    path: "/notifications",
+    element: <Notifications />,
+  },
+  {
+    path: "/teacher-notifications",
+    element: <TeacherNotifications />,
+  },
+  {
+    path: "/my-notifications",
+    element: <TeacherNotifications />,
+  },
+  {
+    path: "/student-dashboard",
+    element: <StudentDashboard />,
+  },
+  {
+    path: "/student-notifications",
+    element: <StudentNotifications />,
   },
 ]);
 

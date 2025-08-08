@@ -2,7 +2,16 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useMutation } from '@tanstack/react-query';
 import Layout from '../components/Layout';
-
+import {
+  TextField,
+  Button,
+  MenuItem,
+  Box,
+  Typography,
+  Snackbar,
+  Alert,
+} from '@mui/material';
+import api from '../api/axios';
 const AddTeacher = () => {
   const [form, setForm] = useState({
     first_name: '',
@@ -20,10 +29,7 @@ const AddTeacher = () => {
 
   const mutation = useMutation({
     mutationFn: async (newTeacher) => {
-      const token = localStorage.getItem('token');
-      return await axios.post('http://127.0.0.1:8000/api/teachers', newTeacher, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      return await api.post('/teachers', newTeacher);
     },
     onSuccess: () => {
       setSuccessMessage('Teacher added successfully!');
@@ -58,106 +64,153 @@ const AddTeacher = () => {
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
-
+  const validateForm = () => {
+    if (!/^[A-Za-z\s]+$/.test(form.first_name)) {
+      alert('First name should contain only letters');
+      return false;
+    }
+    if (!/^[A-Za-z\s]+$/.test(form.last_name)) {
+      alert('Last name should contain only letters');
+      return false;
+    }
+    if (!/^\d{10}$/.test(form.phone_number)) {
+      alert('Phone number must be 10 digits');
+      return false;
+    }
+    if (form.password.length < 6) {
+      alert('Password must be at least 6 characters long');
+      return false;
+    }
+    return true;
+  };
   const handleSubmit = (e) => {
     e.preventDefault();
-    mutation.mutate(form);
+    if (validateForm()) {
+      mutation.mutate(form);
+    }
   };
 
   return (
     <Layout>
-    <div>
-      {successMessage && (
-        <div style={{
-          position: 'fixed',
-          top: '20px',
-          right: '20px',
-          backgroundColor: '#4BB543',
-          color: 'white',
-          padding: '10px 20px',
-          borderRadius: '5px',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
-          zIndex: 1000,
-        }}>
-          {successMessage}
-        </div>
-      )}
-
-      <h2>Add Teacher</h2>
-      <form onSubmit={handleSubmit}>
-        <input
-          name="first_name"
-          placeholder="First Name"
-          value={form.first_name}
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="last_name"
-          placeholder="Last Name"
-          value={form.last_name}
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="email"
-          type="email"
-          placeholder="Email"
-          value={form.email}
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="phone_number"
-          placeholder="Phone Number"
-          value={form.phone}
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="subject_specialization"
-          placeholder="Subject Specialization"
-          value={form.subject_specialization}
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="employee_id"
-          placeholder="Employee ID"
-          value={form.employee_id}
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="date_of_joining"
-          type="date"
-          value={form.date_of_joining}
-          onChange={handleChange}
-          required
-        />
-        <input
-          name="password"
-          type="password"
-          placeholder="Password"
-          value={form.password}
-          onChange={handleChange}
-          required
-        />
-        <select
-          name="status"
-          value={form.status}
-          onChange={handleChange}
-          required
-        >
-          <option value="Active">Active</option>
-          <option value="Inactive">Inactive</option>
-        </select>
-
-        <button type="submit" disabled={mutation.isLoading}>
+    <Box sx={{ maxWidth: 600, mx: 'auto', mt: 5 }}>
+        <Typography variant="h5" gutterBottom>
           Add Teacher
-        </button>
-      </form>
-    </div>
+        </Typography>
+
+        <form onSubmit={handleSubmit}>
+          <TextField
+            label="First Name"
+            name="first_name"
+            fullWidth
+            margin="normal"
+            value={form.first_name}
+            onChange={handleChange}
+            required
+          />
+          <TextField
+            label="Last Name"
+            name="last_name"
+            fullWidth
+            margin="normal"
+            value={form.last_name}
+            onChange={handleChange}
+            required
+          />
+          <TextField
+            label="Email"
+            name="email"
+            type="email"
+            fullWidth
+            margin="normal"
+            value={form.email}
+            onChange={handleChange}
+            required
+          />
+          <TextField
+            label="Phone Number"
+            name="phone_number"
+            fullWidth
+            margin="normal"
+            value={form.phone_number}
+            onChange={handleChange}
+            required
+          />
+          <TextField
+            label="Subject Specialization"
+            name="subject_specialization"
+            fullWidth
+            margin="normal"
+            value={form.subject_specialization}
+            onChange={handleChange}
+            required
+          />
+          <TextField
+            label="Employee ID"
+            name="employee_id"
+            fullWidth
+            margin="normal"
+            value={form.employee_id}
+            onChange={handleChange}
+            required
+          />
+          <TextField
+            label="Date of Joining"
+            name="date_of_joining"
+            type="date"
+            fullWidth
+            margin="normal"
+            InputLabelProps={{ shrink: true }}
+            value={form.date_of_joining}
+            onChange={handleChange}
+            required
+          />
+          <TextField
+            label="Password"
+            name="password"
+            type="password"
+            fullWidth
+            margin="normal"
+            value={form.password}
+            onChange={handleChange}
+            required
+          />
+          <TextField
+            label="Status"
+            name="status"
+            select
+            fullWidth
+            margin="normal"
+            value={form.status}
+            onChange={handleChange}
+            required
+          >
+            <MenuItem value="Active">Active</MenuItem>
+            <MenuItem value="Inactive">Inactive</MenuItem>
+          </TextField>
+
+          <Button
+            type="submit"
+            variant="contained"
+            color="primary"
+            fullWidth
+            disabled={mutation.isLoading}
+            sx={{ mt: 2 }}
+          >
+            {mutation.isLoading ? 'Adding...' : 'Add Teacher'}
+          </Button>
+        </form>
+
+        <Snackbar
+          open={!!successMessage}
+          autoHideDuration={3000}
+          onClose={() => setSuccessMessage('')}
+          anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        >
+          <Alert severity="success" onClose={() => setSuccessMessage('')}>
+            {successMessage}
+          </Alert>
+        </Snackbar>
+      </Box>
     </Layout>
   );
 };

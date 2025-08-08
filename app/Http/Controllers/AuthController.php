@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers;
-
+use App\Models\Teacher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Tymon\JWTAuth\Facades\JWTAuth;
@@ -25,15 +25,17 @@ class AuthController extends Controller
         }
 
         $user = Auth::guard('api')->user(); //the currently authenticated user will be returned under that guard
+        $teacher = Teacher::where('email', $user->email)->first();
         //response(): function that creates HTTP response
-        return response()->json([//response in json format
-            'access_token' => $token,//token obtained above
-            'expires_in' => JWTAuth::factory()->getTTL() * 60,//JWTAuth : lARAVEL FACADE,factory() - helps in token creation, handling etc
+        return response()->json([ //response in json format
+            'access_token' => $token, //token obtained above
+            'expires_in' => JWTAuth::factory()->getTTL() * 60, //JWTAuth : lARAVEL FACADE,factory() - helps in token creation, handling etc
             //TTL - time to live,getTTL() - returns TTL in min
-            'user_id' =>$user->id,
+            'user_id' => $user->id,
             'user_name' => $user->name,
-            'user_email'=> $user->email,
-            'user_role'=> $user->role,
+            'user_email' => $user->email,
+            'user_role' => $user->role,
+            'teacher_id' => $teacher?->id
         ]);
     }
 

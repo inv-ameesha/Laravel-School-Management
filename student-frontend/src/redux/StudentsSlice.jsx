@@ -1,14 +1,10 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import api from '../api/axios';
 //get student data from API
 //createAsyncThunk : used in Redux toolkits for handling API calls
 //students/fetch : action name nad rest get the student details
 export const fetchStudents = createAsyncThunk('students/fetch', async (_, { getState }) => {
-  const token = localStorage.getItem('token'); //token stored
-  const res = await axios.get('http://127.0.0.1:8000/api/students', {//api call to get list of students
-    //await : wait untl response obtained
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await api.get('/students');
   return res.data;//data
 });
 //for student list obtaining create a student state management

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
+import api from "../api/axios";
 import Layout from "../components/Layout";
 const EditTeacher = () => {
   const { id } = useParams();
@@ -20,17 +21,11 @@ const EditTeacher = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
-
-    axios
-      .get(`http://127.0.0.1:8000/api/teachers/${id}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+    api
+      .get(`/teachers/${id}`)
       .then((res) => {
         console.log("API response:", res.data);
-        setForm(res.data.data || res.data); // adapt if your backend wraps the teacher object
+        setForm(res.data.data || res.data);
         setLoading(false);
       })
       .catch((err) => {
@@ -45,14 +40,7 @@ const EditTeacher = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const token = localStorage.getItem("token");
-
-    axios
-      .put(`http://127.0.0.1:8000/api/teachers/${id}`, form, {
-        headers: {
-          Authorization: `Bearer ${token}`, 
-        },
-      })
+    api.put(`/teachers/${id}`, form)
       .then(() => {
         navigate("/teachers");
       })

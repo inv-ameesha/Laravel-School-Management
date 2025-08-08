@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AuthContext } from "../context/AuthContext";
 import withRole from "../hoc/withRole";
 
-const Sidebar = () => {
+const Sidebar = ({ items }) => {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
 
@@ -31,6 +31,54 @@ const Sidebar = () => {
     ),
     "admin"
   );
+  const NotificationsButton = withRole(
+    () => (
+      <button
+        style={{ display: "block", width: "100%", marginBottom: "10px" }}
+        onClick={() => navigate("/notifications")}
+      >
+        Notifications
+      </button>
+    ),
+    "admin"
+  );
+
+  const TeacherNotificationsButton = withRole(
+    () => (
+      <button
+        style={{ display: "block", width: "100%", marginBottom: "10px" }}
+        onClick={() => navigate("/teacher-notifications")}
+      >
+        Notifications
+      </button>
+    ),
+    "teacher"
+  );
+
+  if (items && Array.isArray(items)) {
+    return (
+      <aside
+        style={{
+          paddingTop: "100px",
+          width: "200px",
+          borderRight: "1px solid #ccc",
+          height: "100vh",
+          padding: "20px",
+          boxSizing: "border-box",
+        }}
+      >
+        {items.map((item) => (
+          <button
+            key={item.path}
+            style={{ display: "block", width: "100%", marginBottom: "10px" }}
+            onClick={() => navigate(item.path)}
+          >
+            {item.label}
+          </button>
+        ))}
+      </aside>
+    );
+  }
 
   return (
     <aside
@@ -57,6 +105,8 @@ const Sidebar = () => {
       >
         Add Student
       </button>
+      <NotificationsButton />
+      <TeacherNotificationsButton />
     </aside>
   );
 };
