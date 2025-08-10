@@ -11,9 +11,9 @@ return [
         ],
 
         // You can add other channels here as needed
-        'mail' => [
-            'driver' => 'mail',
-        ],
+        // 'mail' => [
+        //     'driver' => 'mail',
+        // ],
 
         'database' => [
             'driver' => 'database',
