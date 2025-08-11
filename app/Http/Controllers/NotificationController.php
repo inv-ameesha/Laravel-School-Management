@@ -7,6 +7,7 @@ use App\Models\Teacher;
 use App\Models\Notification;
 use Illuminate\Http\Request;
 use App\Notifications\PushTeacherNotification;
+use App\Notifications\PushStudentNotification;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
@@ -14,75 +15,140 @@ class NotificationController extends Controller
 {
     public function index(Request $request)
     {
-        $type = $request->query('type');//gets the type - student,teacher,common
-        //filter the notification on the basis of latest notification first
-        $notifications = Notification::where('type', $type)->latest()->get();
+        $type = $request->query('type', 'all');
+        $publishedOnly = $request->query('published_only') === 'true';
+
+        $query = Notification::query();
+
+        if ($publishedOnly) {
+            $query->where('is_published', true);
+        }
+
+        if ($type !== 'all') {
+            if (!in_array($type, ['student', 'teacher', 'common'])) {
+                return response()->json(['message' => 'Invalid type parameter'], 400);
+            }
+            $query->where('type', $type);
+        }
+
+        $notifications = $query->latest()->get();
+
         return response()->json($notifications);
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'type' => 'required|in:student,teacher,common',//select which type
-            'message' => 'required|string',
-        ]);
+        try {
+            Log::info('Received notification store request', $request->all());
 
-        $notification = Notification::create($validated);
+            $validated = $request->validate([
+                'type' => 'required|in:student,teacher,common',
+                'message' => 'required|string',
+            ]);
 
-        if (in_array($validated['type'], ['teacher', 'common'])) {//if common / teacher type
-            $teacherIds = Teacher::pluck('id');//get all teachers id
+            Log::info('Validated data', $validated);
 
-            $syncData = [];
-            foreach ($teacherIds as $id) {
-                //we will create status unread for all teachers in pivot(notification_teacher) table 
-                $syncData[$id] = ['status' => 'unread'];
-            }
-            //attch the notifications to pivot table
-            //attach is basically for many-to-many relations 
-            $notification->teachers()->attach($syncData);
+            // Perform database operations in a transaction
+            $notification = DB::transaction(function () use ($validated) {
+                $notification = Notification::create($validated);
+                Log::info('Notification created', ['id' => $notification->id]);
 
-            // Send real web push notifications:
-            $teachers = Teacher::whereIn('id', $teacherIds)->get();//loads teacher's data
-            foreach ($teachers as $teacher) {
-                if ($teacher->user) { // assuming teacher has a related User model
-                    $teacher->user->notify(new PushTeacherNotification($validated['message']));
+                if (in_array($validated['type'], ['teacher', 'common'])) {
+                    $teacherIds = Teacher::pluck('id');
+                    Log::info('Teacher IDs', $teacherIds->toArray());
+                    $syncData = [];
+                    foreach ($teacherIds as $id) {
+                        $syncData[$id] = ['status' => 'unread'];
+                    }
+                    $notification->teachers()->attach($syncData);//map every teacher_id to unread status
+                    Log::info('Teachers attached', $syncData);
+                }
+
+                if (in_array($validated['type'], ['student', 'common'])) {
+                    $studentIds = Student::pluck('id');
+                    Log::info('Student IDs', $studentIds->toArray());
+                    $syncData = [];
+                    foreach ($studentIds as $id) {
+                        $syncData[$id] = ['status' => 'unread'];
+                    }
+                    $notification->students()->attach($syncData);
+                    Log::info('Students attached', $syncData);
+                }
+
+                return $notification;
+            });
+
+            // Perform notifications outside transaction
+            $pushErrors = [];
+            if (in_array($validated['type'], ['teacher', 'common'])) {//selects type
+                $teachers = Teacher::whereIn('id', Teacher::pluck('id'))->get();//select teachers
+                foreach ($teachers as $teacher) {
+                    //2conditions - teacher must be a user and that user must have atleast one pushSubscriptions
+                    if ($teacher->user && $teacher->user->pushSubscriptions()->exists()) {
+                        try {
+                            //proceed for the push notification to that teacher user
+                            $teacher->user->notify(new PushTeacherNotification($validated['message']));
+                            Log::info('Push sent to teacher', ['teacher_id' => $teacher->id]);
+                        } catch (\Exception $e) {
+                            $pushErrors[] = "Teacher {$teacher->id}: {$e->getMessage()}";//error string
+                            Log::error('Failed to send push to teacher', [
+                                'teacher_id' => $teacher->id,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    } else {
+                        Log::warning('No user or push subscription for teacher', ['teacher_id' => $teacher->id]);
+                    }
                 }
             }
-        }
 
-        // Attach notifications to students if type is student or common
-        if (in_array($validated['type'], ['student', 'common'])) {
-            $studentIds = Student::pluck('id');
-            $syncData = [];
-            foreach ($studentIds as $id) {
-                $syncData[$id] = ['status' => 'unread'];
-            }
-            $notification->students()->attach($syncData);
-
-            // Send real web push notifications to students with subscriptions
-            $students = Student::whereIn('id', $studentIds)->get();
-            foreach ($students as $student) {
-                if ($student->user) { // assuming student has a related User model
-                    $student->user->notify(new \App\Notifications\PushStudentNotification($validated['message']));
+            if (in_array($validated['type'], ['student', 'common'])) {
+                $students = Student::whereIn('id', Student::pluck('id'))->get();
+                foreach ($students as $student) {
+                    if ($student->user && $student->user->pushSubscriptions()->exists()) {
+                        try {
+                            $student->user->notify(new PushStudentNotification($validated['message']));
+                            Log::info('Push sent to student', ['student_id' => $student->id]);
+                        } catch (\Exception $e) {
+                            $pushErrors[] = "Student {$student->id}: {$e->getMessage()}";
+                            Log::error('Failed to send push to student', [
+                                'student_id' => $student->id,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    } else {
+                        Log::warning('No user or push subscription for student', ['student_id' => $student->id]);
+                    }
                 }
             }
-        }
 
-        return response()->json([
-            'message' => 'Notification created and pushed successfully',
-            'notification' => $notification,
-        ], 201);
+            $response = [
+                'message' => 'Notification created successfully' . (count($pushErrors) ? ' (some push notifications failed)' : ''),
+                'notification' => $notification,
+            ];
+            if (count($pushErrors)) {
+                $response['push_errors'] = $pushErrors;
+            }
+
+            return response()->json($response, 201);
+        } catch (\Exception $e) {
+            Log::error('Error in store notification', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json(['error' => 'Failed to save notification'], 500);
+        }
     }
 
     public function update(Request $request, $id)
     {
-        $validated = $request->validate([//validation
+        $validated = $request->validate([ //validation
             'message' => 'required|string',
         ]);
 
-        $notification = Notification::findOrFail($id);//find notification id
+        $notification = Notification::findOrFail($id); //find notification id
         $notification->update([
-            'message' => $validated['message'],//updation done
+            'message' => $validated['message'], //updation done
         ]);
 
         return response()->json(['message' => 'Notification updated successfully', 'data' => $notification]);
@@ -96,7 +162,7 @@ class NotificationController extends Controller
     public function publish($id)
     {
         $notification = Notification::findOrFail($id);
-        $notification->is_published = !$notification->is_published;//toggle the value
+        $notification->is_published = !$notification->is_published; //toggle the value
         $notification->save();
 
         return response()->json([
@@ -109,10 +175,10 @@ class NotificationController extends Controller
         $user = $request->user();
         $role = $user->role;
 
-        $notifications = Notification::where('is_published', true)//gets the published notifications
+        $notifications = Notification::where('is_published', true) //gets the published notifications
             ->where(function ($query) use ($role) {
-                $query->where('type', $role)//get notifications for that role
-                    ->orWhere('type', 'common');//get notifications common
+                $query->where('type', $role) //get notifications for that role
+                    ->orWhere('type', 'common'); //get notifications common
             })
             ->latest()
             ->get();
@@ -154,7 +220,7 @@ class NotificationController extends Controller
                 return [
                     'id' => $notification->id,
                     'message' => $notification->message,
-                    'status' => $notification->pivot->status,//fetches teacher information from table
+                    'status' => $notification->pivot->status, //fetches teacher information from table
                 ];
             });
 
@@ -182,7 +248,7 @@ class NotificationController extends Controller
         $role = $user->role;
         $unreadOnly = $request->query('unread_only') === 'true'; // check if unread_only=true
 
-        if ($role === 'teacher') {//checks for the logged_in user in the db
+        if ($role === 'teacher') { //checks for the logged_in user in the db
             $teacher = \App\Models\Teacher::where('user_id', $user->id)->first();
 
             if (!$teacher) {
@@ -222,28 +288,28 @@ class NotificationController extends Controller
                     'status' => $notification->pivot->status ?? 'unread',
                 ];
             });
-        // } else {
-        //     // Fallback for roles like admin (without pivot tables)
-        //     $notifications = Notification::where('is_published', true)
-        //         ->where(function ($query) use ($role) {
-        //             $query->where('type', $role)->orWhere('type', 'common');
-        //         })
-        //         ->latest()
-        //         ->get()
-        //         ->map(function ($notification) {
-        //             return [
-        //                 'id' => $notification->id,
-        //                 'message' => $notification->message,
-        //                 'status' => 'unread',
-        //             ];
-        //         });
+        } else {
+            // Fallback for roles like admin (without pivot tables)
+            $notifications = Notification::where('is_published', true)
+                ->where(function ($query) use ($role) {
+                    $query->where('type', $role)->orWhere('type', 'common');
+                })
+                ->latest()
+                ->get()
+                ->map(function ($notification) {
+                    return [
+                        'id' => $notification->id,
+                        'message' => $notification->message,
+                        'status' => 'unread',
+                    ];
+                });
 
-        //     if ($unreadOnly) {
-        //         // All are unread for admin fallback
-        //         $notifications = $notifications->filter(fn($n) => $n['status'] === 'unread')->values();
-        //     }
-        // }
+            if ($unreadOnly) {
+                // All are unread for admin fallback
+                $notifications = $notifications->filter(fn($n) => $n['status'] === 'unread')->values();
+            }
         }
+
         return response()->json($notifications);
     }
     public function getUnreadNotifications(Request $request)
@@ -286,8 +352,8 @@ class NotificationController extends Controller
         return response()->json(['success' => true]);
     }
 
-    
-     //Get notifications for the logged-in student using custom table structure
+
+    //Get notifications for the logged-in student using custom table structure
     public function studentCustomNotifications(Request $request)
     {
         $user = $request->user();
@@ -304,7 +370,7 @@ class NotificationController extends Controller
                 return [
                     'id' => $notification->id,
                     'message' => $notification->message,
-                    'status' => $notification->pivot->status ?? 'unread',//initially/if nothing status set to unread
+                    'status' => $notification->pivot->status ?? 'unread', //initially/if nothing status set to unread
                 ];
             });
 
@@ -341,5 +407,4 @@ class NotificationController extends Controller
 
         return response()->json($unreadNotifications);
     }
-    
 }
